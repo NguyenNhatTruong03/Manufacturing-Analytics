@@ -1,0 +1,13 @@
+oee_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: ------
+      password: ------
+      dbname: oee_analytics
+      schema: marts
+      threads: 4
+      keepalives_idle: 0

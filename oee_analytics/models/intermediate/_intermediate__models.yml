@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: int_events_classified
+    description: >
+      Phan loai tung su kien may (grain 1 dong = 1 su kien, 8,044 dong).
+      Cac gia dinh duoc ghi ro (theo Muc 0 + Muc 4 cua plan):
+      1) 12 dong OEE Category = '0' (rac) -> UNKNOWN, co is_unknown_category.
+      2) 17 dong Duration > 1440 phut (max ~35,332) -> co is_duration_outlier,
+         loai khoi cac tong thoi gian o buoc aggregate (tat ca 17 dong deu la
+         NO/CC va khong co san luong), van giu de truy vet.
+      3) stoppage_class: non-RUN dur < 3 phut = MINOR, >= 3 = MAJOR.
+    columns:
+      - name: oee_status_group
+        description: "RUN / PLANNED_DOWNTIME (PM, NO) / CHANGEOVER (CC) / UNKNOWN (gia tri rac '0')."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['RUN', 'PLANNED_DOWNTIME', 'CHANGEOVER', 'UNKNOWN']
+      - name: stoppage_class
+        description: "MINOR (<3 phut) / MAJOR (>=3 phut), NULL cho RUN."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['MINOR', 'MAJOR']
+      - name: is_duration_outlier
+        tests: [not_null]
+      - name: is_unknown_category
+        tests: [not_null]
+
+  - name: int_daily_machine_product
+    description: >
+      Aggregate theo grain (Machine, Product, Ngay). Day la muc duy nhat ma
+      counter IoT (Total/Good biscuits) duoc tin dung: o muc dong le, 4,116/8,044
+      dong (51%) co Good > Total do sensor nhieu — nen Quality chi duoc tinh
+      sau khi SUM, va duoc CLIP tai 100% bang LEAST (theo Muc 4 checklist).
+      Performance cung CLIP tai 100%.
+    columns:
+      - name: machine
+        tests: [not_null]
+      - name: product
+        tests: [not_null]
+      - name: event_date
+        tests: [not_null]
+      - name: planned_time_min
+        description: "Tong duration trong ngay, DA LOAI dong outlier > 1440 phut."
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "> 0"}
+      - name: run_time_min
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: ">= 0"}
+      - name: availability
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: performance
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: quality
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}

@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Du lieu tho load tu OEE_Manufacturing_Report.xlsx bang script Python
+      (extract_load.py) — schema "raw", khong bien doi. Moi lan chay script
+      la TRUNCATE + INSERT (idempotent).
+    schema: raw
+    tables:
+      - name: raw_fact
+        description: "8,044 dong — 1 dong = 1 su kien trang thai may (IoT), thang 07/2021."
+        loaded_at_field: startdatetime
+        freshness:
+          warn_after: {count: 3650, period: day}
+          error_after: {count: 7300, period: day}
+      - name: raw_target_speeds
+        description: "72 dong — toc do muc tieu (biscuits/hour) cho tung cap Machine + Product."
+      - name: raw_product
+        description: >
+          18 dong — quy cach dong goi san pham. Cot loi chinh ta 'Bsicuits Per Pallet'
+          da duoc loai ngay o buoc load Python (da log), chi giu 'biscuits_per_pallet'.
+      - name: raw_machine
+        description: "10 dong — danh muc may (ten + loai may)."

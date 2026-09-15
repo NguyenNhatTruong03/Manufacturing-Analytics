@@ -1,0 +1,165 @@
+version: 2
+
+models:
+  - name: dim_machine
+    description: "Dim may — 10 dong, surrogate key tu machine_name (da trim)."
+    columns:
+      - name: machine_key
+        tests: [not_null, unique]
+      - name: machine_name
+        tests: [not_null, unique]
+      - name: machine_type
+        tests: [not_null]
+
+  - name: dim_product
+    description: "Dim san pham — 18 dong, surrogate key tu product_name (da trim)."
+    columns:
+      - name: product_key
+        tests: [not_null, unique]
+      - name: product_name
+        tests: [not_null, unique]
+      - name: biscuits_per_pallet
+        tests: [not_null]
+
+  - name: dim_date
+    description: >
+      Dim ngay — date spine cho thang 07/2021 (31 dong), co day_of_week,
+      is_weekend, week_of_month. Phuc vu cau hoi #8 (xu the theo ngay trong tuan).
+    columns:
+      - name: date_key
+        tests: [not_null, unique]
+      - name: is_weekend
+        tests: [not_null]
+
+  - name: fact_machine_events
+    description: >
+      Fact chi tiet su kien may — grain 1 dong = 1 su kien (8,044 dong).
+      Gia dinh outlier: 17 dong Duration > 1440 phut van duoc GIU o day
+      (co is_duration_outlier = true) de truy vet, chi bi loai khoi cac tong
+      thoi gian o fact_oee_daily. 12 dong OEE Category = '0' van duoc giu
+      (oee_status_group = 'UNKNOWN') de bao cao chat luong du lieu.
+    columns:
+      - name: event_id
+        description: >
+          Surrogate key tu (machine, start_datetime, end_datetime, product).
+          LECH PLAN CO GHI RO: plan de key tu (machine, start_datetime, product),
+          nhung du lieu thuc te co 72 cap event trung (machine, start_datetime,
+          product) khac EndDateTime/Duration (sensor phat 2 record cung moc
+          start) — key duoc mo rong them end_datetime de giu grain
+          "1 dong = 1 su kien" va khong phai loai bat ky dong nao.
+        tests: [not_null, unique]
+      - name: machine_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_machine')
+                field: machine_key
+      - name: product_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_key
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: oee_status_group
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['RUN', 'PLANNED_DOWNTIME', 'CHANGEOVER', 'UNKNOWN']
+
+  - name: fact_oee_daily
+    description: >
+      Fact OEE loi — grain 1 dong = Machine + Product + Ngay. Cong thuc OEE
+      dung theo plan Muc 2:
+      availability = run/planned; performance = (total/(run/60))/target clip 100%;
+      quality = good/total clip 100%; oee = A*P*Q.
+      Gia dinh da duyet: 17 dong outlier > 1440 phut loai khoi planned_time
+      (khong dang ke so voi 8,044 dong); Quality/Performance chi tinh o muc
+      aggregate ngay va clip tai 100% do counter IoT nhieu (4,116 dong Good > Total).
+      Luu y chat luong du lieu: sheet Fact chi co 9/8,044 dong Run Time —
+      sensor gan nhu khong ghi nhan trang thai 'Run Time', vi vay Availability
+      tinh theo cong thuc se rat thap. Khong tu y doi cong thuc; de nghi IT
+      xac minh viec gan nhan trang thai tu sensor.
+    columns:
+      - name: machine_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_machine')
+                field: machine_key
+      - name: product_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_key
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: availability
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: performance
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: quality
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: oee
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+
+  - name: mart_oee_monthly_summary
+    description: >
+      Tong hop OEE toan nha may thang 07/2021 (1 dong) — tra loi cau hoi #1.
+      OEE cap thang tinh lai tu tong cac thanh phan (weighted), kem
+      oee_weighted_avg (trung binh OEE ngay co trong so run_time).
+    columns:
+      - name: year_month
+        tests: [not_null, unique]
+      - name: availability
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: performance
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+      - name: quality
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: "<= 1"}
+
+  - name: mart_whatif_pm_reduction
+    description: >
+      What-if: giam 15% thoi gian PM (bao duong dinh ky) -> gio chay them va
+      san luong them uoc tinh theo throughput binh quan cua tung may
+      (tra loi cau hoi #10). Grain: 1 dong = 1 may.
+    columns:
+      - name: machine
+        tests:
+          - not_null
+          - unique
+      - name: pm_downtime_reduced_min
+        description: "pm_downtime_min * 0.15."
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: ">= 0"}

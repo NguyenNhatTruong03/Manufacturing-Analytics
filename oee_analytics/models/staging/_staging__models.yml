@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: stg_fact_events
+    description: >
+      Staging cua raw.raw_fact. Chi rename/cast/trim/dedup — khong co business logic.
+      Cac ten may co khoang trang thua (vd "Biscuit Filling Machine ") duoc TRIM
+      tai day de join an toan voi Dim/Target Speeds (theo Muc 4 checklist).
+      DEDUP: 3 cap event trung (machine, start_datetime, end_datetime, product)
+      do cam bien ghi 2 lan (trung Duration, chi khac gia tri counter IoT) —
+      giu 1 dong moi cap, 8,044 -> 8,041 dong. Day la dedup o cap identity
+      event, khong phai loai du lieu hop le (72 cap con lai trung (machine,
+      start, product) nhung khac EndDateTime la cac su kien rieng, duoc giu).
+    columns:
+      - name: machine
+        description: "Ten may da TRIM."
+        tests: [not_null]
+      - name: start_datetime
+        tests: [not_null]
+      - name: end_datetime
+        tests: [not_null]
+      - name: duration_minutes
+        description: "Duration phut — gia tri goc, outlier > 1440 chua duoc loc o day (loc o intermediate)."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 0}
+      - name: total_biscuits_made
+        description: "Counter IoT — KHONG tin o muc dong le (51% dong Good > Total), chi dung sau khi SUM theo ngay."
+        tests: [not_null]
+      - name: good_biscuits_made
+        description: "Counter IoT — nhu tren."
+        tests: [not_null]
+      - name: oee_category_raw
+        description: "Gia tri goc: 'Run Time', 'CC (Changeover Cleaning)', 'PM (Maintenance)', 'NO (No Order)', va 12 dong rac '0'."
+        tests: [not_null]
+      - name: product
+        description: "Ten san pham da TRIM."
+        tests: [not_null]
+
+  - name: stg_target_speeds
+    description: "Staging cua raw.raw_target_speeds — target biscuits/hour cho tung cap Machine + Product (72 dong, khong duplicate)."
+    columns:
+      - name: machine
+        tests: [not_null]
+      - name: product
+        tests: [not_null]
+      - name: target_biscuits_per_hour
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments: {min_value: 1}
+
+  - name: stg_product
+    description: >
+      Staging cua raw.raw_product (18 dong). Cot loi chinh ta "Bsicuits Per Pallet"
+      da duoc loai o buoc load Python (co log); giu duy nhat biscuits_per_pallet.
+    columns:
+      - name: product_name
+        tests:
+          - not_null
+          - unique
+      - name: biscuits_per_pallet
+        tests: [not_null]
+
+  - name: stg_machine
+    description: "Staging cua raw.raw_machine (10 dong danh muc may)."
+    columns:
+      - name: machine_name
+        tests:
+          - not_null
+          - unique

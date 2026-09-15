@@ -1,0 +1,12 @@
+# dbt
+oee_analytics/target/
+oee_analytics/dbt_packages/
+oee_analytics/logs/
+oee_analytics/*.log
+
+# Metabase runtime (app DB H2 + jar)
+oee_analytics/metabase.db*
+oee_analytics/metabase.jar
+
+# Credentials
+# oee_analytics/profiles.yml
