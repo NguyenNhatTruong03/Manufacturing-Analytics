@@ -36,9 +36,8 @@ MARTS         (tables)  → Star Schema: dim_machine, dim_product, dim_date,
 
 Script `oee_analytics/extract_load.py`:
 
-- Đọc 4 sheet bằng pandas/openpyxl; chỉ làm việc "kỹ thuật": đổi tên cột về snake_case, ép kiểu datetime, loại cột lỗi chính tả `Bsicuits Per Pallet` của sheet Product (có log WARNING).
-- Nạp vào schema `raw` bằng SQLAlchemy + psycopg2 với **TRUNCATE + INSERT** — chạy lại bao nhiêu lần kết quả vẫn giống nhau (đã test chạy 2 lần, số dòng không đổi).
-- Log số dòng mỗi sheet và đối chiếu với kế hoạch (Fact phải ra đúng 8.044).
+- Đọc 4 sheet bằng pandas/openpyxl; đổi tên cột về snake_case, ép kiểu datetime, loại cột lỗi chính tả `Bsicuits Per Pallet` của sheet Product (có log WARNING).
+- Nạp vào schema `raw` bằng SQLAlchemy + psycopg2 với **TRUNCATE + INSERT**
 
 | Sheet | Bảng raw | Số dòng |
 |---|---|---|
@@ -160,17 +159,17 @@ pip install pandas openpyxl sqlalchemy psycopg2-binary dbt-postgres requests
 # 1. Tạo database
 psql -U postgres -c "CREATE DATABASE oee_analytics"
 
-# 2. Giai đoạn A — Extract & Load (idempotent)
+# 2. Extract & Load 
 python oee_analytics/extract_load.py
 
-# 3. Giai đoạn B — dbt build (kỳ vọng PASS 85/85)
+# 3. dbt build
 cd oee_analytics
 dbt deps --profiles-dir .
 dbt build --profiles-dir .
 dbt docs generate --profiles-dir .
 
-# 4. Giai đoạn C — Metabase + dashboard
-java -jar metabase.jar                    # chờ http://localhost:3000 healthy
+# 4. Metabase + dashboard
+java -jar metabase.jar 
 python build_metabase_dashboard.py
 ```
 
@@ -188,14 +187,7 @@ oee_analytics/
 ├── build_metabase_dashboard.py   # Giai đoạn C (Metabase REST API)
 └── target/index.html             # dbt docs
 data/raw_data/                    # Đề bài.docx + OEE Manufacturing Report.xlsx
-VAN_DE_DU_LIEU_BAN_DAU.md         # Kịch bản giải thích vấn đề dữ liệu
-KHO_KHAN_GIAI_PHAP.txt            # Biên bản khó khăn & cách xử lý
 ```
-
-## 🔐 Bảo mật trước khi push GitHub
-
-`profiles.yml` (đã vào `.gitignore`) chứa password Postgres local; `build_metabase_dashboard.py` chứa password Metabase demo — chuyển ra biến môi trường trước khi public repo.
-
 ---
 
 ## 📎 PHỤ LỤC A — Vì sao các số liệu cũ không còn chính xác (dữ liệu sai như thế nào)
