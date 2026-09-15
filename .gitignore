@@ -8,5 +8,5 @@ oee_analytics/*.log
 oee_analytics/metabase.db*
 oee_analytics/metabase.jar
 
-# Credentials
-# oee_analytics/profiles.yml
+# Credentials (chua password local — KHONG push len GitHub)
+oee_analytics/profiles.yml

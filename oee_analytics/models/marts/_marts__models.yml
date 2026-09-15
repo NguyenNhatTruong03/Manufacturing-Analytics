@@ -70,24 +70,25 @@ models:
                 to: ref('dim_date')
                 field: date_key
       - name: oee_status_group
+        description: "RUN / CHANGEOVER (CC) / PLANNED_DOWNTIME_PM (PM) / NO_ORDER (NO - Schedule Loss, loai khoi mau so Planned) / UNKNOWN (gia tri rac '0')."
         tests:
           - accepted_values:
               arguments:
-                values: ['RUN', 'PLANNED_DOWNTIME', 'CHANGEOVER', 'UNKNOWN']
+                values: ['RUN', 'CHANGEOVER', 'PLANNED_DOWNTIME_PM', 'NO_ORDER', 'UNKNOWN']
 
   - name: fact_oee_daily
     description: >
-      Fact OEE loi — grain 1 dong = Machine + Product + Ngay. Cong thuc OEE
-      dung theo plan Muc 2:
-      availability = run/planned; performance = (total/(run/60))/target clip 100%;
-      quality = good/total clip 100%; oee = A*P*Q.
-      Gia dinh da duyet: 17 dong outlier > 1440 phut loai khoi planned_time
-      (khong dang ke so voi 8,044 dong); Quality/Performance chi tinh o muc
-      aggregate ngay va clip tai 100% do counter IoT nhieu (4,116 dong Good > Total).
-      Luu y chat luong du lieu: sheet Fact chi co 9/8,044 dong Run Time —
-      sensor gan nhu khong ghi nhan trang thai 'Run Time', vi vay Availability
-      tinh theo cong thuc se rat thap. Khong tu y doi cong thuc; de nghi IT
-      xac minh viec gan nhan trang thai tu sensor.
+      Fact OEE loi — grain 1 dong = Machine + Product + Ngay.
+      CONG THUC (ban chinh sua 2026-09-15 theo chi thi cua nguoi duyet):
+      planned_time_min loai dong outlier > 1440 phut VA loai NO (No Order) —
+      NO la Schedule Loss theo Lean OEE (khong co lenh san xuat thi khong mat
+      Availability, khong cong vao Downtime); downtime_min = CC + PM;
+      run_time_min = planned - downtime; availability = run/planned;
+      performance = (total/(run/60))/target clip 100%; quality = good/total
+      clip 100%; oee = A*P*Q.
+      Gia dinh khac da ghi: Quality/Performance chi tinh o muc aggregate ngay
+      va clip tai 100% do counter IoT nhieu (4,116 dong Good > Total); 9 nhom
+      ngay chi toan NO bi loai bo vi planned = 0 thi khong do duoc OEE.
     columns:
       - name: machine_key
         tests:
@@ -110,6 +111,16 @@ models:
               arguments:
                 to: ref('dim_date')
                 field: date_key
+      - name: planned_time_min
+        description: "Planned Production Time: tong duration khong outlier, KHONG tinh NO (No Order) — Schedule Loss theo Lean OEE."
+      - name: run_time_min
+        description: >
+          ASSUMPTION (bat buoc ghi ro): Run Time duoc suy ra tu Planned Time
+          tru CC/PM, KHONG dung literal category = 'Run Time' vi nhan nay
+          gan nhu khong xuat hien trong du lieu goc (chi 9/8,044 dong,
+          ~240 phut, tap trung o 1/10 may — khong the lam tu so Availability).
+      - name: downtime_min
+        description: "Chi gom CC (Changeover) + PM (Maintenance); NO (No Order) khong duoc cong vao Downtime."
       - name: availability
         tests:
           - dbt_utils.expression_is_true:

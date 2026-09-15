@@ -3,20 +3,24 @@ version: 2
 models:
   - name: int_events_classified
     description: >
-      Phan loai tung su kien may (grain 1 dong = 1 su kien, 8,044 dong).
+      Phan loai tung su kien may (grain 1 dong = 1 su kien, 8,041 dong sau dedup).
       Cac gia dinh duoc ghi ro (theo Muc 0 + Muc 4 cua plan):
       1) 12 dong OEE Category = '0' (rac) -> UNKNOWN, co is_unknown_category.
       2) 17 dong Duration > 1440 phut (max ~35,332) -> co is_duration_outlier,
          loai khoi cac tong thoi gian o buoc aggregate (tat ca 17 dong deu la
          NO/CC va khong co san luong), van giu de truy vet.
       3) stoppage_class: non-RUN dur < 3 phut = MINOR, >= 3 = MAJOR.
+      4) Ban chinh sua 2026-09-15: NO (No Order) tach nhom rieng NO_ORDER
+      (Schedule Loss theo Lean OEE — loai khoi mau so Planned, khong cong vao
+      Downtime); PM tach nhom PLANNED_DOWNTIME_PM de cong thuc downtime =
+      CHANGEOVER + PLANNED_DOWNTIME_PM ro rang.
     columns:
       - name: oee_status_group
-        description: "RUN / PLANNED_DOWNTIME (PM, NO) / CHANGEOVER (CC) / UNKNOWN (gia tri rac '0')."
+        description: "RUN / CHANGEOVER (CC) / PLANNED_DOWNTIME_PM (PM) / NO_ORDER (NO - Schedule Loss) / UNKNOWN (gia tri rac '0')."
         tests:
           - accepted_values:
               arguments:
-                values: ['RUN', 'PLANNED_DOWNTIME', 'CHANGEOVER', 'UNKNOWN']
+                values: ['RUN', 'CHANGEOVER', 'PLANNED_DOWNTIME_PM', 'NO_ORDER', 'UNKNOWN']
       - name: stoppage_class
         description: "MINOR (<3 phut) / MAJOR (>=3 phut), NULL cho RUN."
         tests:
@@ -35,6 +39,10 @@ models:
       dong (51%) co Good > Total do sensor nhieu — nen Quality chi duoc tinh
       sau khi SUM, va duoc CLIP tai 100% bang LEAST (theo Muc 4 checklist).
       Performance cung CLIP tai 100%.
+      CONG THUC THOI GIAN (ban chinh sua 2026-09-15): planned loai NO (No Order)
+      — Schedule Loss theo Lean OEE; downtime = CC + PM; run_time = planned -
+      downtime (suy ra, khong dung literal 'Run Time'). Co 9 nhom ngay chi toan
+      NO bi loai bo (HAVING planned > 0) vi planned = 0 thi khong do duoc OEE.
     columns:
       - name: machine
         tests: [not_null]
@@ -43,12 +51,22 @@ models:
       - name: event_date
         tests: [not_null]
       - name: planned_time_min
-        description: "Tong duration trong ngay, DA LOAI dong outlier > 1440 phut."
+        description: "Tong duration trong ngay, DA LOAI dong outlier > 1440 phut VA loai NO (No Order) — NO la Schedule Loss, khong vao mau so Planned Production Time."
         tests:
           - not_null
           - dbt_utils.expression_is_true:
               arguments: {expression: "> 0"}
       - name: run_time_min
+        description: >
+          ASSUMPTION (bat buoc ghi ro): Run Time duoc suy ra tu Planned Time
+          tru CC/PM, KHONG dung literal category = 'Run Time' vi nhan nay
+          gan nhu khong xuat hien trong du lieu goc (chi 9/8,044 dong,
+          ~240 phut, tap trung o 1/10 may).
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments: {expression: ">= 0"}
+      - name: downtime_min
+        description: "Tong thoi gian CHANGEOVER (CC) + PLANNED_DOWNTIME_PM (PM); NO khong duoc cong vao day."
         tests:
           - dbt_utils.expression_is_true:
               arguments: {expression: ">= 0"}

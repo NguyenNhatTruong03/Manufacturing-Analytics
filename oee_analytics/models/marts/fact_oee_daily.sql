@@ -1,10 +1,13 @@
 -- MART: fact_oee_daily — grain: 1 dong = Machine + Product + Ngay.
--- Bang loi de tinh OEE va tra loi phan lon 10 cau hoi (theo Muc 2 cua plan).
+-- Bang loi de tinh OEE va tra loi phan lon 10 cau hoi.
 --
--- Cong thuc (dung theo plan, khong doi):
---   planned_time_min = tong duration cua moi event trong ngay, TRU dong outlier
---   run_time_min     = tong duration khi oee_status_group = 'RUN'
---   downtime_min     = planned_time_min - run_time_min
+-- Cong thuc (ban chinh sua 2026-09-15 theo chi thi cua nguoi duyet):
+--   planned_time_min = tong duration, TRU dong outlier > 1440 phut,
+--                      VA TRU 'NO (No Order)' — NO la Schedule Loss theo
+--                      Lean OEE, loai khoi mau so, khong cong vao Downtime
+--   downtime_min     = tong thoi gian CC (CHANGEOVER) + PM (PLANNED_DOWNTIME_PM)
+--   run_time_min     = planned_time_min - downtime_min  (SUy RA, khong dung
+--                      literal 'Run Time' — nhan nay chi co 9/8,044 dong)
 --   availability     = run_time_min / planned_time_min
 --   performance      = (total_biscuits_made / (run_time_min/60)) / target,
 --                      clip tai 100% (LEAST 1.0) do nhieu sensor
@@ -27,7 +30,7 @@ select
     dd.day_name,
     d.planned_time_min,
     d.run_time_min,
-    d.planned_time_min - d.run_time_min as downtime_min,
+    d.downtime_min,
     d.changeover_time_min,
     d.pm_downtime_min,
     d.minor_stoppage_min,

@@ -5,8 +5,8 @@ oee_analytics:
       type: postgres
       host: localhost
       port: 5432
-      user: ------
-      password: ------
+      user: postgres
+      password: postgres
       dbname: oee_analytics
       schema: marts
       threads: 4
